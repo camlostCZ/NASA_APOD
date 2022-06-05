@@ -5,9 +5,12 @@ Requires:
     Python 3.9+
 """
 
+from http.client import IncompleteRead
 import logging
+from pickletools import read_string1
 import re
 import ssl
+from tokenize import triple_quoted
 import urllib.request
 import urllib.error
 
@@ -20,8 +23,9 @@ URL_BASE = "https://apod.nasa.gov/apod/archivepix.html"
 PATTERN_SUBPAGE = r'^(\d{4}[^:]+):\s+<a href="([^"]+)[^>]+>([^<]+)<\/a>.*$'
 PATTERN_IMAGE = r'^<img src="([^"]+)"$'
 
-DATE_START = "2020-01-01"    # ISO 8601 format
-
+DATE_START_DEBUG = "2022-06-01"
+#DATE_START = "2020-01-01"    # ISO 8601 format
+DATE_START = DATE_START_DEBUG
 
 def get_parent_url(url: str) -> str:
     """
@@ -58,14 +62,21 @@ def load_archive(
     date_fixed = date_start.replace("-", "")[2:]    # Get rid of '-' and first 2 digits
     page_start = f"ap{date_fixed}"
 
-    with urllib.request.urlopen(url) as f:
-        for item in f:
-            line = item.decode('ISO-8859-1').strip()
-            logging.debug(line)
-            if (match := pattern.match(line)):
-                when, link, title = match.groups()
-                if link >= page_start:    # Yield only links in the date range
-                    yield (when, link, title)
+    tries_left = 3
+    while tries_left > 0:
+        try:
+            with urllib.request.urlopen(url) as f:
+                for item in f:
+                    line = item.decode('ISO-8859-1').strip()
+                    logging.debug(line)
+                    if (match := pattern.match(line)):
+                        when, link, title = match.groups()
+                        if link >= page_start:    # Yield only links in the date range
+                            yield (when, link, title)
+            tries_left = 0
+        except IncompleteRead:
+            logging.warning("HTTP read failed, retrying.")
+            tries_left -= 1
     # End of function
 
 
@@ -80,12 +91,19 @@ def find_image_on_page(page_url: str) -> Optional[str]:
         Image link or None if none found.
     """
     result = None
-    with urllib.request.urlopen(page_url) as page:
-        for item in page:
-            line = item.decode('ISO-8859-1').strip()
-            pattern = re.compile(PATTERN_IMAGE, re.IGNORECASE)
-            if (match := pattern.match(line)):
-                result = match[1]
+    tries_left = 3
+    while tries_left > 0:
+        try:
+            with urllib.request.urlopen(page_url) as page:
+                for item in page:
+                    line = item.decode('ISO-8859-1').strip()
+                    pattern = re.compile(PATTERN_IMAGE, re.IGNORECASE)
+                    if (match := pattern.match(line)):
+                        result = match[1]
+            tries_left = 0
+        except IncompleteRead:
+            logging.warning("HTTP read failed, retrying.")
+            tries_left -= 0
     return result
 
 
@@ -118,10 +136,18 @@ def save_image_from_url(url: str, name: str, folder: str = "./") -> None:
         name: Filename used to save image
         folder: Directory (folder) used to save image to. Defaults to "./".
     """
-    with urllib.request.urlopen(url) as page:
-        p = Path(folder) / name
-        with open(p, mode="wb") as f:
-            f.write(page.read())
+
+    tries_left = 3
+    while tries_left > 0:
+        try:
+            with urllib.request.urlopen(url) as page:
+                p = Path(folder) / name
+                with open(p, mode="wb") as f:
+                    f.write(page.read())
+            tries_left = 0
+        except IncompleteRead:
+            logging.warning("HTTP read failed, retrying.")
+            tries_left -= 1
 
 
 def main() -> None:
