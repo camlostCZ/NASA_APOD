@@ -103,7 +103,7 @@ def find_image_on_page(page_url: str) -> Optional[str]:
             tries_left = 0
         except IncompleteRead:
             logging.warning("HTTP read failed, retrying.")
-            tries_left -= 0
+            tries_left -= 1
     return result
 
 
