@@ -23,9 +23,9 @@ URL_BASE = "https://apod.nasa.gov/apod/archivepix.html"
 PATTERN_SUBPAGE = r'^(\d{4}[^:]+):\s+<a href="([^"]+)[^>]+>([^<]+)<\/a>.*$'
 PATTERN_IMAGE = r'^<img src="([^"]+)"$'
 
+DATE_START = "2020-01-01"    # ISO 8601 format
 DATE_START_DEBUG = "2022-06-01"
-#DATE_START = "2020-01-01"    # ISO 8601 format
-DATE_START = DATE_START_DEBUG
+#DATE_START = DATE_START_DEBUG
 
 def get_parent_url(url: str) -> str:
     """
